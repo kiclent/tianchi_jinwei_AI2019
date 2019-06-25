@@ -16,6 +16,16 @@ Desc    : PNG 大图切割程序。临时恶补的PNG解码知识，难免会有
           https://blog.csdn.net/chijingjing/article/details/80186018
 """
 
+"""
+update: 2019-06-26 00:30:05
+很尴尬的修复了一个低级的BUG，原程序切割图片时会漏掉右边的一小部分
+
+简单说一下程序思路：
+1.参考PNG文件格式规范将PNG图片被压缩的像素数据块（IDAT）解析出来（解压缩）；
+2.当解析的像素达到 block_size[0]*image_width时，对这个图像块进行解码（filter_type）， 并按(block_size[0], block_size[1])大小进行切分保存；
+3.重复1、2操作，直到文件数据被解析完。
+"""
+
 import os
 import struct
 import zlib
@@ -174,11 +184,15 @@ def png_sub(png_file, save_dir, block_size=(512, 512)):
 
                 bytes_stream = bytes_stream[block_height*(image_info['width']*_BYTE_COLOR_TYPE+1):]
 
-                for i in range(0, image_info['width'] - block_size[1], block_size[1]):
-                    sub_image = row_block[:, i:i+block_size[1]]
-                    sub_image = Image.fromarray(sub_image, mode=mode)
-                    sub_image.save(os.path.join(save_dir, 'img_{}_{}_.png'.format(row_cnt, int(np.ceil(i/block_size[1])))))
-                    print('block ({}, {})'.format(row_cnt, int(np.ceil(i/block_size[1]))))
+
+                # ------------------------------------------
+                # 修复了一个BUG 原程序会漏掉最右边的一小部分图片
+                for i in range(0, image_info['width'], block_size[1]):
+                    if i < image_info['width']:
+                        sub_image = row_block[:, i:i+block_size[1]]
+                        sub_image = Image.fromarray(sub_image, mode=mode)
+                        sub_image.save(os.path.join(save_dir, 'img_{}_{}_.png'.format(row_cnt, int(np.ceil(i/block_size[1])))))
+                        print('block ({}, {})'.format(row_cnt, int(np.ceil(i/block_size[1]))))
 
                 row_cnt += 1
 
@@ -256,8 +270,8 @@ if __name__ == "__main__":
     # ------------- test data ----------------
     # test image_3.png
     png_file = '../data/jingwei_round1_test_a_20190619/image_3.png'
-    check_png(png_file)
-    # png_sub(png_file, '../data/sub/test_a_3', block_size)
+    # check_png(png_file)
+    png_sub(png_file, '../data/sub/test_a_3', block_size)
     print('test image_3.png', tc() - tic)
 
     # test image_4.png
